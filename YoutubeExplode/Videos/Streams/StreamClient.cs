@@ -11,6 +11,8 @@ using YoutubeExplode.ReverseEngineering;
 using YoutubeExplode.ReverseEngineering.Cipher;
 using YoutubeExplode.ReverseEngineering.Responses;
 
+using AngleSharp.Html.Parser;
+
 namespace YoutubeExplode.Videos.Streams
 {
     /// <summary>
@@ -46,6 +48,18 @@ namespace YoutubeExplode.Videos.Streams
         private async Task<StreamContext> GetSteamContextFromVideoInfoAsync(VideoId videoId)
         {
             var embedPage = await EmbedPage.GetAsync(_httpClient, videoId);
+            return await GetStreamContextFromAsync(videoId, embedPage);
+        }
+
+        private async Task<StreamContext> GetSteamContextFromVideoInfoAsync(VideoId videoId, string rawEmbedPage)
+        {
+            var embedPage =  EmbedPage.Parse(rawEmbedPage); 
+            return await GetStreamContextFromAsync(videoId, embedPage);
+        }
+        
+        private async Task<StreamContext> GetStreamContextFromAsync(VideoId videoId, EmbedPage embedPage)
+        {
+            
             var playerConfig =
                 embedPage.TryGetPlayerConfig() ??
                 throw VideoUnplayableException.Unplayable(videoId);
@@ -86,9 +100,20 @@ namespace YoutubeExplode.Videos.Streams
             return new StreamContext(streamInfoProviders, cipherOperations);
         }
 
-        private async Task<StreamContext> GetStreamContextFromWatchPageAsync(VideoId videoId)
-        {
+        private async Task<StreamContext> GetStreamContextFromWatchPageAsync(VideoId videoId, string rawWatchPage){
+            
+            var watchPage =  WatchPage.Parse(rawWatchPage); 
+            return await GetStreamContextFromAsync(videoId, watchPage);
+        }
+
+        private async Task<StreamContext> GetStreamContextFromWatchPageAsync(VideoId videoId){
+
             var watchPage = await WatchPage.GetAsync(_httpClient, videoId);
+            return await GetStreamContextFromAsync(videoId, watchPage);
+        }
+
+        private async Task<StreamContext> GetStreamContextFromAsync(VideoId videoId, WatchPage watchPage)
+        {  
             var playerConfig = watchPage.TryGetPlayerConfig();
 
             var playerResponse =
@@ -244,6 +269,25 @@ namespace YoutubeExplode.Videos.Streams
             }
 
             return new StreamManifest(streams.Values.ToArray());
+        }
+
+        /// <summary>
+        /// Gets the manifest that contains information about available streams in the specified raw page.
+        /// </summary>
+        public async Task<StreamManifest> GetManifestFromRawAsync(VideoId videoId, string rawPage)
+        {
+            // We can try to extract the manifest from two sources: get_video_info and the video watch page.
+            // In some cases one works, in some cases another does.
+            try
+            {
+                var context = await GetSteamContextFromVideoInfoAsync(videoId, rawPage);
+                return await GetManifestAsync(context);
+            }
+            catch (YoutubeExplodeException)
+            {
+                var context = await GetStreamContextFromWatchPageAsync(videoId, rawPage);
+                return await GetManifestAsync(context);
+            }
         }
 
         /// <summary>
