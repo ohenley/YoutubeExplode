@@ -11,8 +11,6 @@ using YoutubeExplode.ReverseEngineering;
 using YoutubeExplode.ReverseEngineering.Cipher;
 using YoutubeExplode.ReverseEngineering.Responses;
 
-using AngleSharp.Html.Parser;
-
 namespace YoutubeExplode.Videos.Streams
 {
     /// <summary>
